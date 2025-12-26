@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X } from 'lucide-react';
+import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X, TerminalSquare } from 'lucide-react';
 import { generateTestCasesForRequirement } from '../services/aiService';
+
+// Get backend URL from environment (must be prefixed with VITE_ for Vite)
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+// Convert HTTP URL to WebSocket URL (http -> ws, https -> wss)
+const getWebSocketUrl = (httpUrl: string): string => {
+    return httpUrl.replace(/^http/, 'ws');
+};
 
 // Interface matching actual Supabase schema
 interface DBTestCase {
@@ -19,8 +27,15 @@ const TestCasesPage = () => {
     const [requirements, setRequirements] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
+
+    // Code View Modal State
     const [codeModalOpen, setCodeModalOpen] = useState(false);
     const [selectedCode, setSelectedCode] = useState<string>('');
+
+    // Remote Runner Terminal State
+    const [terminalOpen, setTerminalOpen] = useState(false);
+    const [logs, setLogs] = useState<string[]>([]);
+    const ws = useRef<WebSocket | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -73,7 +88,7 @@ const TestCasesPage = () => {
     };
 
     const handleViewCode = (tc: DBTestCase) => {
-        const code = `# Test Case: ${tc.description}\n# Compliance: ${tc.compliance_tag}\n# Created: ${new Date(tc.created_at).toLocaleDateString()}\n\ndef test_${tc.description.toLowerCase().replace(/\s+/g, '_').substring(0, 30)}():\n    \"\"\"\n    Steps:\n${tc.steps?.map((s, i) => `    ${i + 1}. ${s}`).join('\n') || '    No steps defined'}\n    \n    Expected: ${tc.expected_result}\n    \"\"\"\n    # TODO: Implement test logic\n    pass`;
+        const code = `# Test Case: ${tc.description}\n# Compliance: ${tc.compliance_tag}\n# Created: ${new Date(tc.created_at).toLocaleDateString()}\n\ndef test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():\n    \"\"\"\n    Steps:\n${tc.steps?.map((s, i) => `    ${i + 1}. ${s}`).join('\n') || '    No steps defined'}\n    \n    Expected: ${tc.expected_result}\n    \"\"\"\n    # TODO: Implement test logic\n    pass`;
         setSelectedCode(code);
         setCodeModalOpen(true);
     };
@@ -84,11 +99,150 @@ const TestCasesPage = () => {
         if (!error) fetchData();
     };
 
+    // --- Remote Test Execution Logic ---
+    const handleRunAllTests = async () => {
+        // 1. Get Repo URL (Mocking extraction from project metadata or prompt)
+        const repoUrl = prompt("Enter GitHub Repo URL to clone and test:", "https://github.com/athrvadmile/medtest-demo");
+        if (!repoUrl) return;
+
+        // 2. Prepare Generated Test Files (Convert DB cases to Python)
+        const testFileContent = `
+import pytest
+
+${testCases.map(tc => `
+def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
+    """
+    Title: ${tc.description}
+    Compliance: ${tc.compliance_tag}
+    Expected: ${tc.expected_result}
+    """
+    # Auto-generated steps:
+    # ${tc.steps?.join('\n    # ') || 'No steps'}
+    assert True  # Placeholder for actual assertion logic
+`).join('\n\n')}
+`;
+
+        const payload = {
+            repo_url: repoUrl,
+            test_files: [
+                { filename: "tests/test_generated_ai.py", content: testFileContent }
+            ]
+        };
+
+        // 3. Connect to WebSocket
+        setLogs([]);
+        setTerminalOpen(true);
+
+        // Convert HTTP URL to WebSocket URL and connect
+        const wsUrl = getWebSocketUrl(backendUrl);
+        ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
+
+        ws.current.onopen = () => {
+            setLogs(prev => [...prev, "Connected to Test Runner Service..."]);
+            ws.current?.send(JSON.stringify(payload));
+        };
+
+        ws.current.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === 'log' || msg.type === 'output') {
+                setLogs(prev => [...prev, msg.data]);
+                // Auto scroll to bottom
+                const terminalEnd = document.getElementById('terminal-end');
+                if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
+            } else if (msg.type === 'status') {
+                setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
+            } else if (msg.type === 'error') {
+                setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
+            } else if (msg.type === 'complete') {
+                setLogs(prev => [...prev, `[DONE] Process finished with status: ${msg.status}`]);
+                ws.current?.close();
+            }
+        };
+
+        ws.current.onclose = () => {
+            setLogs(prev => [...prev, "Connection closed."]);
+        };
+
+        ws.current.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            setLogs(prev => [...prev, "[ERROR] WebSocket connection failed. Is the backend running?"]);
+        };
+    };
+
+    // --- Execute Single Test Case ---
+    const handleExecuteSingleTest = async (tc: DBTestCase) => {
+        // 1. Get Repo URL
+        const repoUrl = prompt("Enter GitHub Repo URL to clone and test:", "https://github.com/athrvadmile/medtest-demo");
+        if (!repoUrl) return;
+
+        // 2. Prepare Single Test File
+        const testFileContent = `
+import pytest
+
+def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
+    """
+    Title: ${tc.description}
+    Compliance: ${tc.compliance_tag}
+    Expected: ${tc.expected_result}
+    """
+    # Auto-generated steps:
+    # ${tc.steps?.join('\n    # ') || 'No steps'}
+    assert True  # Placeholder for actual assertion logic
+`;
+
+        const payload = {
+            repo_url: repoUrl,
+            test_files: [
+                { filename: `tests/test_single_${tc.id.substring(0, 8)}.py`, content: testFileContent }
+            ]
+        };
+
+        // 3. Connect to WebSocket
+        setLogs([]);
+        setTerminalOpen(true);
+
+        const wsUrl = getWebSocketUrl(backendUrl);
+        ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
+
+        ws.current.onopen = () => {
+            setLogs(prev => [...prev, `Connected to Test Runner Service...`]);
+            setLogs(prev => [...prev, `Executing: ${tc.description}`]);
+            ws.current?.send(JSON.stringify(payload));
+        };
+
+        ws.current.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === 'log' || msg.type === 'output') {
+                setLogs(prev => [...prev, msg.data]);
+                const terminalEnd = document.getElementById('terminal-end');
+                if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
+            } else if (msg.type === 'status') {
+                setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
+            } else if (msg.type === 'error') {
+                setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
+            } else if (msg.type === 'complete') {
+                setLogs(prev => [...prev, `[DONE] Test "${tc.description}" finished with status: ${msg.status}`]);
+                ws.current?.close();
+            }
+        };
+
+        ws.current.onclose = () => {
+            setLogs(prev => [...prev, "Connection closed."]);
+        };
+
+        ws.current.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            setLogs(prev => [...prev, "[ERROR] WebSocket connection failed. Is the backend running?"]);
+        };
+    };
+
     if (loading) return <div className="p-8 text-center text-slate-500">Loading test suite...</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Code Modal */}
+            {/* Code View Modal */}
             {codeModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCodeModalOpen(false)}>
                     <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -110,6 +264,9 @@ const TestCasesPage = () => {
                 </div>
             )}
 
+            {/* Remote Execution Terminal Modal */}
+            <TestRunnerTerminal logs={logs} isOpen={terminalOpen} onClose={() => setTerminalOpen(false)} />
+
             <div className="flex justify-between items-end">
                 <div className="flex flex-col gap-1">
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">AI Test Suite</h1>
@@ -124,7 +281,10 @@ const TestCasesPage = () => {
                         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                         Generate More Tests
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">
+                    <button
+                        onClick={handleRunAllTests}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"
+                    >
                         <Play className="w-4 h-4" /> Run All Tests
                     </button>
                 </div>
@@ -186,7 +346,10 @@ const TestCasesPage = () => {
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:border-primary-500 hover:text-primary-600 transition-all shadow-sm">
+                            <button
+                                onClick={() => handleExecuteSingleTest(tc)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:border-primary-500 hover:text-primary-600 transition-all shadow-sm"
+                            >
                                 <Play className="w-3.5 h-3.5" /> Execute Test
                             </button>
                         </div>
@@ -200,6 +363,44 @@ const TestCasesPage = () => {
                         <p className="text-slate-500 mt-2">Generate requirements first to create prioritized, risk-based test cases.</p>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+// Sub-component for terminal output
+const TestRunnerTerminal = ({ logs, isOpen, onClose }: { logs: string[], isOpen: boolean, onClose: () => void }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-950 w-full max-w-4xl h-[80vh] rounded-2xl border border-slate-800 flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                    <span className="font-mono text-emerald-400 font-bold flex items-center gap-2">
+                        <TerminalSquare className="w-4 h-4" />
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Remote Test Execution
+                    </span>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="flex-1 p-6 overflow-auto font-mono text-xs space-y-1.5">
+                    {logs.map((log, i) => (
+                        <div key={i} className="break-words">
+                            <span className="text-slate-600 select-none mr-2">[{new Date().toLocaleTimeString()}]</span>
+                            <span className={
+                                log.startsWith('> ') ? 'text-yellow-400 font-bold' :
+                                    log.startsWith('[ERROR]') ? 'text-rose-500 font-bold' :
+                                        log.startsWith('[STATUS]') ? 'text-blue-400 font-bold' :
+                                            log.startsWith('[DONE]') ? 'text-emerald-400 font-bold' :
+                                                'text-slate-300'
+                            }>
+                                {log}
+                            </span>
+                        </div>
+                    ))}
+                    <div id="terminal-end" />
+                </div>
             </div>
         </div>
     );
