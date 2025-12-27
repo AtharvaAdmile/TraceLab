@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Github, Search, CheckCircle2, AlertCircle, Loader2, FileText, ShieldCheck, Zap } from 'lucide-react';
+import { Github, Search, CheckCircle2, AlertCircle, Loader2, FileText, ShieldCheck, Zap, Trash2 } from 'lucide-react';
 import { parseGithubUrl, fetchRepoContents, generateDigest, fetchCommitHistory, fetchPullRequests } from '../services/githubService';
 import { analyzeCodebase, setAIProvider, getAIProvider } from '../services/aiService';
 import type { AIProvider } from '../services/aiService';
@@ -18,6 +18,35 @@ const DashboardPage = () => {
     const handleProviderChange = (newProvider: AIProvider) => {
         setProvider(newProvider);
         setAIProvider(newProvider);
+    };
+
+    const handleClearAllData = async () => {
+        if (!window.confirm('Are you absolutely sure? This will delete all repositories, requirements, test cases, and compliance issues. This action cannot be undone.')) {
+            return;
+        }
+
+        setStatus('loading');
+        setMessage('Clearing all data...');
+
+        try {
+            // Sequential deletion to respect potential foreign keys (though Supabase usually handles cascade if set up, we'll be explicit)
+            const tables = ['compliance_issues', 'test_cases', 'requirements', 'projects'];
+
+            for (const table of tables) {
+                setMessage(`Clearing ${table}...`);
+                const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+                if (error) throw error;
+            }
+
+            setStatus('success');
+            setMessage('All system data has been wiped.');
+            setRepoMetadata(null);
+            setUrl('');
+        } catch (error: any) {
+            console.error(error);
+            setStatus('error');
+            setMessage(`Cleanup failed: ${error.message}`);
+        }
     };
 
     const handleConnect = async () => {
@@ -239,6 +268,24 @@ const DashboardPage = () => {
                     title="Traceability Gap Analysis"
                     desc="Visually maps requirements to code and identifies untested logic."
                 />
+            </div>
+
+            {/* Danger Zone */}
+            <div className="mt-12 p-8 border-2 border-dashed border-rose-100 rounded-3xl bg-rose-50/30 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                    <h3 className="text-xl font-bold text-rose-900 flex items-center gap-2">
+                        <Trash2 className="w-5 h-5" />
+                        Danger Zone
+                    </h3>
+                    <p className="text-rose-600 text-sm mt-1">Permanently delete all projects, requirements, tests, and compliance records.</p>
+                </div>
+                <button
+                    onClick={handleClearAllData}
+                    disabled={status === 'loading'}
+                    className="px-8 py-3 bg-white border-2 border-rose-200 text-rose-600 rounded-2xl font-bold hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                    Clear All System Data
+                </button>
             </div>
         </div>
     );

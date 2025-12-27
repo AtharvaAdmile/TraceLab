@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X, TerminalSquare } from 'lucide-react';
-import { generateTestCasesForRequirement } from '../services/aiService';
+import { generateTestCasesForRequirement, setAIProvider } from '../services/aiService';
 
 // Get backend URL from environment (must be prefixed with VITE_ for Vite)
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -11,7 +11,7 @@ const getWebSocketUrl = (httpUrl: string): string => {
     return httpUrl.replace(/^http/, 'ws');
 };
 
-// Interface matching actual Supabase schema
+// Interface matching actual Supabase schema with executable test fields
 interface DBTestCase {
     id: string;
     requirement_id: string;
@@ -20,6 +20,11 @@ interface DBTestCase {
     expected_result: string;
     compliance_tag: string;
     created_at: string;
+    // New executable test fields
+    test_script: string;        // Python pytest code
+    dependencies: string[];      // pip packages needed
+    target_files: string[];      // Repo files this test applies to
+    repo_url: string;           // GitHub repository URL
 }
 
 const TestCasesPage = () => {
@@ -55,20 +60,33 @@ const TestCasesPage = () => {
             alert('No requirements found. Please analyze a repository first.');
             return;
         }
+
+        // Get repo URL once for all test cases
+        const repoUrl = prompt("Enter GitHub Repo URL for test generation:", "https://github.com/athrvadmile/medtest-demo");
+        if (!repoUrl) return;
+
         setGenerating(true);
+        // Use Gemini for test case generation
+        setAIProvider('Gemini');
         try {
             const req = requirements[0];
-            const newTcs = await generateTestCasesForRequirement(req, `Source: ${req.source || 'unknown'}`);
+            // Pass repoUrl to AI for context-aware test generation
+            const newTcs = await generateTestCasesForRequirement(req, `Source: ${req.source || 'unknown'}`, repoUrl);
 
             if (newTcs.length > 0) {
-                // Insert matching actual Supabase schema
+                // Insert with new executable test fields
                 const { error } = await supabase.from('test_cases').insert(
                     newTcs.map(tc => ({
                         description: tc.title || 'Generated Test Case',
                         steps: tc.steps || [],
                         expected_result: tc.expected_result || '',
                         compliance_tag: (tc as any).compliance_tag || req.compliance_tags?.[0] || 'General',
-                        requirement_id: req.id
+                        requirement_id: req.id,
+                        // New executable fields
+                        test_script: tc.test_script || '',
+                        dependencies: tc.dependencies || ['pytest'],
+                        target_files: tc.target_files || [],
+                        repo_url: repoUrl
                     }))
                 );
                 if (error) {
@@ -88,7 +106,8 @@ const TestCasesPage = () => {
     };
 
     const handleViewCode = (tc: DBTestCase) => {
-        const code = `# Test Case: ${tc.description}\n# Compliance: ${tc.compliance_tag}\n# Created: ${new Date(tc.created_at).toLocaleDateString()}\n\ndef test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():\n    \"\"\"\n    Steps:\n${tc.steps?.map((s, i) => `    ${i + 1}. ${s}`).join('\n') || '    No steps defined'}\n    \n    Expected: ${tc.expected_result}\n    \"\"\"\n    # TODO: Implement test logic\n    pass`;
+        // Use stored test_script if available, otherwise generate placeholder
+        const code = tc.test_script || `# Test Case: ${tc.description}\n# Compliance: ${tc.compliance_tag}\n# Created: ${new Date(tc.created_at).toLocaleDateString()}\n# Dependencies: ${tc.dependencies?.join(', ') || 'pytest'}\n# Target Files: ${tc.target_files?.join(', ') || 'None'}\n\nimport pytest\n\ndef test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():\n    \"\"\"\n    Steps:\n${tc.steps?.map((s, i) => `    ${i + 1}. ${s}`).join('\n') || '    No steps defined'}\n    \n    Expected: ${tc.expected_result}\n    \"\"\"\n    # TODO: Implement test logic\n    assert True`;
         setSelectedCode(code);
         setCodeModalOpen(true);
     };
@@ -101,15 +120,44 @@ const TestCasesPage = () => {
 
     // --- Remote Test Execution Logic ---
     const handleRunAllTests = async () => {
-        // 1. Get Repo URL (Mocking extraction from project metadata or prompt)
-        const repoUrl = prompt("Enter GitHub Repo URL to clone and test:", "https://github.com/athrvadmile/medtest-demo");
-        if (!repoUrl) return;
+        if (testCases.length === 0) {
+            alert('No test cases to run. Please generate test cases first.');
+            return;
+        }
 
-        // 2. Prepare Generated Test Files (Convert DB cases to Python)
-        const testFileContent = `
-import pytest
+        // 1. Collect all unique dependencies and target files from test cases
+        const allDependencies = new Set<string>(['pytest']); // Always include pytest
+        const allTargetFiles = new Set<string>();
+        let repoUrl = '';
 
-${testCases.map(tc => `
+        testCases.forEach(tc => {
+            // Collect dependencies
+            if (tc.dependencies && Array.isArray(tc.dependencies)) {
+                tc.dependencies.forEach(dep => allDependencies.add(dep));
+            }
+            // Collect target files
+            if (tc.target_files && Array.isArray(tc.target_files)) {
+                tc.target_files.forEach(file => allTargetFiles.add(file));
+            }
+            // Use first non-empty repo_url found
+            if (!repoUrl && tc.repo_url) {
+                repoUrl = tc.repo_url;
+            }
+        });
+
+        // Fallback: prompt for repo URL only if none stored
+        if (!repoUrl) {
+            repoUrl = prompt("No repo URL found in test cases. Enter GitHub Repo URL:", "https://github.com/athrvadmile/medtest-demo") || '';
+            if (!repoUrl) return;
+        }
+
+        // 2. Combine all test scripts into one file (or use individual stored scripts)
+        const combinedTestScript = testCases.map(tc => {
+            // Use stored test_script if available, otherwise generate from steps
+            if (tc.test_script) {
+                return tc.test_script;
+            }
+            return `
 def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
     """
     Title: ${tc.description}
@@ -118,27 +166,37 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
     """
     # Auto-generated steps:
     # ${tc.steps?.join('\n    # ') || 'No steps'}
-    assert True  # Placeholder for actual assertion logic
-`).join('\n\n')}
+    assert True  # Placeholder
 `;
+        }).join('\n\n');
 
+        const testFileContent = `import pytest\n\n${combinedTestScript}`;
+
+        // 3. Build payload with auto-detected values
         const payload = {
             repo_url: repoUrl,
-            test_files: [
-                { filename: "tests/test_generated_ai.py", content: testFileContent }
-            ]
+            branch: "main",
+            test_script: {
+                filename: "tests/test_generated_ai.py",
+                content: testFileContent
+            },
+            dependencies: Array.from(allDependencies),
+            repo_files: Array.from(allTargetFiles).map(path => ({ path }))
         };
 
-        // 3. Connect to WebSocket
+        // 4. Connect to WebSocket
         setLogs([]);
         setTerminalOpen(true);
 
-        // Convert HTTP URL to WebSocket URL and connect
         const wsUrl = getWebSocketUrl(backendUrl);
         ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
 
         ws.current.onopen = () => {
-            setLogs(prev => [...prev, "Connected to Test Runner Service..."]);
+            setLogs(prev => [...prev, "🔗 Connected to Test Runner Service..."]);
+            setLogs(prev => [...prev, `🔗 Repository: ${repoUrl}`]);
+            setLogs(prev => [...prev, `📦 Dependencies (auto-detected): ${Array.from(allDependencies).join(', ')}`]);
+            setLogs(prev => [...prev, `📁 Target files (auto-detected): ${allTargetFiles.size > 0 ? Array.from(allTargetFiles).join(', ') : 'None (isolated test)'}`]);
+            setLogs(prev => [...prev, `🧪 Running ${testCases.length} test case(s)...`]);
             ws.current?.send(JSON.stringify(payload));
         };
 
@@ -147,21 +205,37 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
             if (msg.type === 'log' || msg.type === 'output') {
                 setLogs(prev => [...prev, msg.data]);
-                // Auto scroll to bottom
                 const terminalEnd = document.getElementById('terminal-end');
                 if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
             } else if (msg.type === 'status') {
                 setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
+            } else if (msg.type === 'warning') {
+                setLogs(prev => [...prev, `[WARN] ${msg.data}`]);
             } else if (msg.type === 'error') {
                 setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
             } else if (msg.type === 'complete') {
-                setLogs(prev => [...prev, `[DONE] Process finished with status: ${msg.status}`]);
+                // Display structured results
+                setLogs(prev => [...prev, `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
+                setLogs(prev => [...prev, `📊 TEST RESULTS`]);
+                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
+                setLogs(prev => [...prev, `Status: ${msg.status.toUpperCase()}`]);
+                setLogs(prev => [...prev, `Message: ${msg.message}`]);
+
+                if (msg.results) {
+                    setLogs(prev => [...prev, `✅ Passed: ${msg.results.passed}`]);
+                    setLogs(prev => [...prev, `❌ Failed: ${msg.results.failed}`]);
+                    setLogs(prev => [...prev, `⚠️  Errors: ${msg.results.errors}`]);
+                    setLogs(prev => [...prev, `⏭️  Skipped: ${msg.results.skipped}`]);
+                    setLogs(prev => [...prev, `📈 Total: ${msg.results.total}`]);
+                }
+
+                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`]);
                 ws.current?.close();
             }
         };
 
         ws.current.onclose = () => {
-            setLogs(prev => [...prev, "Connection closed."]);
+            setLogs(prev => [...prev, "🔌 Connection closed."]);
         };
 
         ws.current.onerror = (err) => {
@@ -172,12 +246,25 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
     // --- Execute Single Test Case ---
     const handleExecuteSingleTest = async (tc: DBTestCase) => {
-        // 1. Get Repo URL
-        const repoUrl = prompt("Enter GitHub Repo URL to clone and test:", "https://github.com/athrvadmile/medtest-demo");
-        if (!repoUrl) return;
+        // 1. Use stored repo URL or fallback to prompt
+        let repoUrl = tc.repo_url;
+        if (!repoUrl) {
+            repoUrl = prompt("No repo URL stored. Enter GitHub Repo URL:", "https://github.com/athrvadmile/medtest-demo") || '';
+            if (!repoUrl) return;
+        }
 
-        // 2. Prepare Single Test File
-        const testFileContent = `
+        // 2. Use stored dependencies or default to pytest
+        const dependencies = tc.dependencies && tc.dependencies.length > 0
+            ? tc.dependencies
+            : ['pytest'];
+
+        // 3. Use stored target files
+        const repoFiles = tc.target_files && tc.target_files.length > 0
+            ? tc.target_files.map(path => ({ path }))
+            : [];
+
+        // 4. Use stored test script or generate placeholder
+        const testFileContent = tc.test_script || `
 import pytest
 
 def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
@@ -191,14 +278,19 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
     assert True  # Placeholder for actual assertion logic
 `;
 
+        // 5. Build payload with stored/auto-detected values
         const payload = {
             repo_url: repoUrl,
-            test_files: [
-                { filename: `tests/test_single_${tc.id.substring(0, 8)}.py`, content: testFileContent }
-            ]
+            branch: "main",
+            test_script: {
+                filename: `tests/test_single_${tc.id.substring(0, 8)}.py`,
+                content: testFileContent
+            },
+            dependencies: dependencies,
+            repo_files: repoFiles
         };
 
-        // 3. Connect to WebSocket
+        // 6. Connect to WebSocket
         setLogs([]);
         setTerminalOpen(true);
 
@@ -206,8 +298,11 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
         ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
 
         ws.current.onopen = () => {
-            setLogs(prev => [...prev, `Connected to Test Runner Service...`]);
-            setLogs(prev => [...prev, `Executing: ${tc.description}`]);
+            setLogs(prev => [...prev, `🔗 Connected to Test Runner Service...`]);
+            setLogs(prev => [...prev, `🧪 Executing: ${tc.description}`]);
+            setLogs(prev => [...prev, `🔗 Repository: ${repoUrl}`]);
+            setLogs(prev => [...prev, `📦 Dependencies (stored): ${dependencies.join(', ')}`]);
+            setLogs(prev => [...prev, `📁 Target files (stored): ${repoFiles.length > 0 ? repoFiles.map(f => f.path).join(', ') : 'None (isolated test)'}`]);
             ws.current?.send(JSON.stringify(payload));
         };
 
@@ -220,16 +315,31 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
                 if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
             } else if (msg.type === 'status') {
                 setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
+            } else if (msg.type === 'warning') {
+                setLogs(prev => [...prev, `[WARN] ${msg.data}`]);
             } else if (msg.type === 'error') {
                 setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
             } else if (msg.type === 'complete') {
-                setLogs(prev => [...prev, `[DONE] Test "${tc.description}" finished with status: ${msg.status}`]);
+                // Display structured results
+                setLogs(prev => [...prev, `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
+                setLogs(prev => [...prev, `📊 TEST RESULT: ${tc.description}`]);
+                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
+                setLogs(prev => [...prev, `Status: ${msg.status.toUpperCase()}`]);
+                setLogs(prev => [...prev, `Message: ${msg.message}`]);
+
+                if (msg.results) {
+                    setLogs(prev => [...prev, `✅ Passed: ${msg.results.passed}`]);
+                    setLogs(prev => [...prev, `❌ Failed: ${msg.results.failed}`]);
+                    setLogs(prev => [...prev, `⚠️  Errors: ${msg.results.errors}`]);
+                }
+
+                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`]);
                 ws.current?.close();
             }
         };
 
         ws.current.onclose = () => {
-            setLogs(prev => [...prev, "Connection closed."]);
+            setLogs(prev => [...prev, "🔌 Connection closed."]);
         };
 
         ws.current.onerror = (err) => {

@@ -32,6 +32,10 @@ export interface TestCase {
     compliance_verification: string;
     risk_mitigation: string;
     code: string;
+    // New fields for executable test cases
+    test_script: string;           // Executable Python test code
+    dependencies: string[];         // Required pip packages (e.g., ["pytest", "requests"])
+    target_files: string[];         // Repo files the test applies to (e.g., ["src/auth/login.py"])
 }
 
 let activeProvider: AIProvider = 'Ollama';
@@ -137,9 +141,9 @@ Output only valid JSON array. No preamble.
     }
 };
 
-export const generateTestCasesForRequirement = async (requirement: ExtractedRequirement, relatedCode: string): Promise<TestCase[]> => {
+export const generateTestCasesForRequirement = async (requirement: ExtractedRequirement, relatedCode: string, repoUrl?: string): Promise<TestCase[]> => {
     const prompt = `
-You are a healthcare QA expert creating test cases for medical device software.
+You are a healthcare QA automation expert creating EXECUTABLE test cases for medical device software.
 
 Requirement:
 ${requirement.content}
@@ -148,21 +152,43 @@ Compliance Standards: ${requirement.compliance_tags?.join(', ') || 'General'}
 Risk Level: ${requirement.risk_level || 'Medium'}
 Source Code Context:
 ${relatedCode}
+${repoUrl ? `Repository URL: ${repoUrl}` : ''}
 
-Generate exactly 3 test cases (keep it concise):
+Generate exactly 3 EXECUTABLE test cases (with real Python pytest code):
 1. Positive scenario (happy path)
 2. Negative scenario (invalid input)
 3. Boundary/Compliance scenario
 
-For EACH test case, output JSON with these exact fields:
+For EACH test case, output JSON with these EXACT fields:
 {
   "test_case_id": "TC-001",
   "title": "Short descriptive title",
   "type": "Positive",
   "steps": ["Step 1", "Step 2", "Step 3"],
   "expected_result": "What should happen",
-  "compliance_tag": "IEC_62304"
+  "compliance_tag": "IEC_62304",
+  "test_script": "import pytest\\n\\ndef test_example():\\n    # Test implementation\\n    assert True",
+  "dependencies": ["pytest", "requests"],
+  "target_files": ["src/auth/login.py", "src/utils/validator.py"]
 }
+IMPORTANT RULES for test_script:
+- Write complete, FULLY IMPLEMENTED Python pytest code.
+- DO NOT use "assert True" or "# TODO". All logic must be concrete.
+- Include necessary imports at the top.
+- Use descriptive function names starting with test_.
+- Implement actual mock logic or logic that tests the specific code context provided.
+- Reference the target_files if testing specific functionality.
+- If dependencies are needed (like mock or requests), include them in the 'dependencies' array.
+
+IMPORTANT RULES for dependencies:
+- List ONLY the pip packages needed to run this specific test
+- Always include "pytest" as the test runner
+- Include any libraries used in the test (requests, numpy, etc.)
+
+IMPORTANT RULES for target_files:
+- List the specific source files from the repository that this test validates
+- Use relative paths from repo root (e.g., "src/auth/login.py")
+- If testing general functionality, use empty array []
 
 Output ONLY a valid JSON array with 3 objects. No markdown, no explanation.
 `;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ExtractedRequirement } from '../services/aiService';
-import { generateTestCasesForRequirement } from '../services/aiService';
+import { generateTestCasesForRequirement, setAIProvider } from '../services/aiService';
 import { ClipboardList, ExternalLink, Filter, AlertTriangle, FileText, Zap, X, Code, Loader2 } from 'lucide-react';
 
 const RequirementsPage = () => {
@@ -30,6 +30,8 @@ const RequirementsPage = () => {
 
     const handleGenerateTestCases = async (req: ExtractedRequirement) => {
         setGeneratingFor(req.req_id);
+        // Use Gemini for test case generation
+        setAIProvider('Gemini');
         try {
             const newTestCases = await generateTestCasesForRequirement(req, `Source: ${req.source}`);
 
@@ -41,7 +43,11 @@ const RequirementsPage = () => {
                         steps: tc.steps || [],
                         expected_result: tc.expected_result || '',
                         compliance_tag: (tc as any).compliance_tag || req.compliance_tags?.[0] || 'General',
-                        requirement_id: (req as any).id
+                        requirement_id: (req as any).id,
+                        // Save executable fields
+                        test_script: tc.test_script || '',
+                        dependencies: tc.dependencies || ['pytest'],
+                        target_files: tc.target_files || []
                     }))
                 );
                 if (error) {
