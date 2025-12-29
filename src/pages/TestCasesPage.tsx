@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X, TerminalSquare } from 'lucide-react';
+import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X } from 'lucide-react';
 import { generateTestCasesForRequirement, setAIProvider } from '../services/aiService';
+import TestResultsModal, { type TestResult } from '../components/TestResultsModal';
 
 // Get backend URL from environment (must be prefixed with VITE_ for Vite)
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -16,14 +17,15 @@ interface DBTestCase {
     id: string;
     requirement_id: string;
     description: string;
-    steps: string[];
     expected_result: string;
     compliance_tag: string;
     created_at: string;
-    // New executable test fields
-    test_script: string;        // Python pytest code
-    dependencies: string[];      // pip packages needed
-    target_files: string[];      // Repo files this test applies to
+    // Executable test fields
+    test_script: string;        // Executable test code in target language
+    test_filename: string;      // Test file name (e.g., "test_text_processor.js")
+    language: string;           // Programming language
+    dependencies: string[];     // Required packages from target file imports
+    target_files: string[];     // Repo files this test applies to
     repo_url: string;           // GitHub repository URL
 }
 
@@ -37,9 +39,11 @@ const TestCasesPage = () => {
     const [codeModalOpen, setCodeModalOpen] = useState(false);
     const [selectedCode, setSelectedCode] = useState<string>('');
 
-    // Remote Runner Terminal State
-    const [terminalOpen, setTerminalOpen] = useState(false);
+    // Test Results Modal State
+    const [resultsModalOpen, setResultsModalOpen] = useState(false);
+    const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
+    const [isRunning, setIsRunning] = useState(false);
     const ws = useRef<WebSocket | null>(null);
 
     useEffect(() => {
@@ -74,17 +78,18 @@ const TestCasesPage = () => {
             const newTcs = await generateTestCasesForRequirement(req, `Source: ${req.source || 'unknown'}`, repoUrl);
 
             if (newTcs.length > 0) {
-                // Insert with new executable test fields
+                // Insert with executable test fields
                 const { error } = await supabase.from('test_cases').insert(
                     newTcs.map(tc => ({
                         description: tc.title || 'Generated Test Case',
-                        steps: tc.steps || [],
                         expected_result: tc.expected_result || '',
-                        compliance_tag: (tc as any).compliance_tag || req.compliance_tags?.[0] || 'General',
+                        compliance_tag: tc.compliance_tag || req.compliance_tags?.[0] || 'General',
                         requirement_id: req.id,
-                        // New executable fields
+                        // Executable test fields
                         test_script: tc.test_script || '',
-                        dependencies: tc.dependencies || ['pytest'],
+                        test_filename: tc.test_filename || '',
+                        language: tc.language || 'python',
+                        dependencies: tc.dependencies || [],
                         target_files: tc.target_files || [],
                         repo_url: repoUrl
                     }))
@@ -106,8 +111,8 @@ const TestCasesPage = () => {
     };
 
     const handleViewCode = (tc: DBTestCase) => {
-        // Use stored test_script if available, otherwise generate placeholder
-        const code = tc.test_script || `# Test Case: ${tc.description}\n# Compliance: ${tc.compliance_tag}\n# Created: ${new Date(tc.created_at).toLocaleDateString()}\n# Dependencies: ${tc.dependencies?.join(', ') || 'pytest'}\n# Target Files: ${tc.target_files?.join(', ') || 'None'}\n\nimport pytest\n\ndef test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():\n    \"\"\"\n    Steps:\n${tc.steps?.map((s, i) => `    ${i + 1}. ${s}`).join('\n') || '    No steps defined'}\n    \n    Expected: ${tc.expected_result}\n    \"\"\"\n    # TODO: Implement test logic\n    assert True`;
+        // Use stored test_script if available, otherwise show placeholder
+        const code = tc.test_script || `# Test Case: ${tc.description}\n# Language: ${tc.language || 'unknown'}\n# Compliance: ${tc.compliance_tag}\n# Dependencies: ${tc.dependencies?.join(', ') || 'None'}\n# Target Files: ${tc.target_files?.join(', ') || 'None'}\n\n# No test script generated`;
         setSelectedCode(code);
         setCodeModalOpen(true);
     };
@@ -153,21 +158,11 @@ const TestCasesPage = () => {
 
         // 2. Combine all test scripts into one file (or use individual stored scripts)
         const combinedTestScript = testCases.map(tc => {
-            // Use stored test_script if available, otherwise generate from steps
+            // Use stored test_script if available
             if (tc.test_script) {
                 return tc.test_script;
             }
-            return `
-def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
-    """
-    Title: ${tc.description}
-    Compliance: ${tc.compliance_tag}
-    Expected: ${tc.expected_result}
-    """
-    # Auto-generated steps:
-    # ${tc.steps?.join('\n    # ') || 'No steps'}
-    assert True  # Placeholder
-`;
+            return `# Placeholder for: ${tc.description}\n# No test script generated`;
         }).join('\n\n');
 
         const testFileContent = `import pytest\n\n${combinedTestScript}`;
@@ -186,7 +181,15 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
         // 4. Connect to WebSocket
         setLogs([]);
-        setTerminalOpen(true);
+        setIsRunning(true);
+        setTestResult({
+            status: 'running',
+            message: 'Connecting to test runner...',
+            testName: `Running ${testCases.length} test(s)`,
+            repoUrl: repoUrl,
+            dependencies: Array.from(allDependencies)
+        });
+        setResultsModalOpen(true);
 
         const wsUrl = getWebSocketUrl(backendUrl);
         ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
@@ -205,8 +208,6 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
             if (msg.type === 'log' || msg.type === 'output') {
                 setLogs(prev => [...prev, msg.data]);
-                const terminalEnd = document.getElementById('terminal-end');
-                if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
             } else if (msg.type === 'status') {
                 setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
             } else if (msg.type === 'warning') {
@@ -214,33 +215,33 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
             } else if (msg.type === 'error') {
                 setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
             } else if (msg.type === 'complete') {
-                // Display structured results
-                setLogs(prev => [...prev, `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
-                setLogs(prev => [...prev, `📊 TEST RESULTS`]);
-                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
-                setLogs(prev => [...prev, `Status: ${msg.status.toUpperCase()}`]);
-                setLogs(prev => [...prev, `Message: ${msg.message}`]);
-
-                if (msg.results) {
-                    setLogs(prev => [...prev, `✅ Passed: ${msg.results.passed}`]);
-                    setLogs(prev => [...prev, `❌ Failed: ${msg.results.failed}`]);
-                    setLogs(prev => [...prev, `⚠️  Errors: ${msg.results.errors}`]);
-                    setLogs(prev => [...prev, `⏭️  Skipped: ${msg.results.skipped}`]);
-                    setLogs(prev => [...prev, `📈 Total: ${msg.results.total}`]);
-                }
-
-                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`]);
+                setIsRunning(false);
+                setTestResult({
+                    status: msg.status === 'success' ? 'passed' : msg.status === 'failed' ? 'failed' : 'error',
+                    message: msg.message,
+                    results: msg.results,
+                    testName: `${testCases.length} Test Case(s)`,
+                    repoUrl: repoUrl,
+                    dependencies: Array.from(allDependencies)
+                });
+                setLogs(prev => [...prev, `✅ Test execution complete`]);
                 ws.current?.close();
             }
         };
 
         ws.current.onclose = () => {
             setLogs(prev => [...prev, "🔌 Connection closed."]);
+            setIsRunning(false);
         };
 
         ws.current.onerror = (err) => {
             console.error('WebSocket error:', err);
             setLogs(prev => [...prev, "[ERROR] WebSocket connection failed. Is the backend running?"]);
+            setIsRunning(false);
+            setTestResult({
+                status: 'error',
+                message: 'WebSocket connection failed. Is the backend running?'
+            });
         };
     };
 
@@ -263,20 +264,8 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
             ? tc.target_files.map(path => ({ path }))
             : [];
 
-        // 4. Use stored test script or generate placeholder
-        const testFileContent = tc.test_script || `
-import pytest
-
-def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30)}():
-    """
-    Title: ${tc.description}
-    Compliance: ${tc.compliance_tag}
-    Expected: ${tc.expected_result}
-    """
-    # Auto-generated steps:
-    # ${tc.steps?.join('\n    # ') || 'No steps'}
-    assert True  # Placeholder for actual assertion logic
-`;
+        // 4. Use stored test script or show error
+        const testFileContent = tc.test_script || `# No test script generated for: ${tc.description}`;
 
         // 5. Build payload with stored/auto-detected values
         const payload = {
@@ -292,7 +281,15 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
         // 6. Connect to WebSocket
         setLogs([]);
-        setTerminalOpen(true);
+        setIsRunning(true);
+        setTestResult({
+            status: 'running',
+            message: 'Connecting to test runner...',
+            testName: tc.description,
+            repoUrl: repoUrl,
+            dependencies: dependencies
+        });
+        setResultsModalOpen(true);
 
         const wsUrl = getWebSocketUrl(backendUrl);
         ws.current = new WebSocket(`${wsUrl}/ws/run-tests`);
@@ -301,8 +298,8 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
             setLogs(prev => [...prev, `🔗 Connected to Test Runner Service...`]);
             setLogs(prev => [...prev, `🧪 Executing: ${tc.description}`]);
             setLogs(prev => [...prev, `🔗 Repository: ${repoUrl}`]);
-            setLogs(prev => [...prev, `📦 Dependencies (stored): ${dependencies.join(', ')}`]);
-            setLogs(prev => [...prev, `📁 Target files (stored): ${repoFiles.length > 0 ? repoFiles.map(f => f.path).join(', ') : 'None (isolated test)'}`]);
+            setLogs(prev => [...prev, `📦 Dependencies: ${dependencies.join(', ')}`]);
+            setLogs(prev => [...prev, `📁 Target files: ${repoFiles.length > 0 ? repoFiles.map(f => f.path).join(', ') : 'None (isolated test)'}`]);
             ws.current?.send(JSON.stringify(payload));
         };
 
@@ -311,8 +308,6 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
 
             if (msg.type === 'log' || msg.type === 'output') {
                 setLogs(prev => [...prev, msg.data]);
-                const terminalEnd = document.getElementById('terminal-end');
-                if (terminalEnd) terminalEnd.scrollIntoView({ behavior: 'smooth' });
             } else if (msg.type === 'status') {
                 setLogs(prev => [...prev, `[STATUS] ${msg.message}`]);
             } else if (msg.type === 'warning') {
@@ -320,31 +315,33 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
             } else if (msg.type === 'error') {
                 setLogs(prev => [...prev, `[ERROR] ${msg.data}`]);
             } else if (msg.type === 'complete') {
-                // Display structured results
-                setLogs(prev => [...prev, `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
-                setLogs(prev => [...prev, `📊 TEST RESULT: ${tc.description}`]);
-                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`]);
-                setLogs(prev => [...prev, `Status: ${msg.status.toUpperCase()}`]);
-                setLogs(prev => [...prev, `Message: ${msg.message}`]);
-
-                if (msg.results) {
-                    setLogs(prev => [...prev, `✅ Passed: ${msg.results.passed}`]);
-                    setLogs(prev => [...prev, `❌ Failed: ${msg.results.failed}`]);
-                    setLogs(prev => [...prev, `⚠️  Errors: ${msg.results.errors}`]);
-                }
-
-                setLogs(prev => [...prev, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`]);
+                setIsRunning(false);
+                setTestResult({
+                    status: msg.status === 'success' ? 'passed' : msg.status === 'failed' ? 'failed' : 'error',
+                    message: msg.message,
+                    results: msg.results,
+                    testName: tc.description,
+                    repoUrl: repoUrl,
+                    dependencies: dependencies
+                });
+                setLogs(prev => [...prev, `✅ Test execution complete`]);
                 ws.current?.close();
             }
         };
 
         ws.current.onclose = () => {
             setLogs(prev => [...prev, "🔌 Connection closed."]);
+            setIsRunning(false);
         };
 
         ws.current.onerror = (err) => {
             console.error('WebSocket error:', err);
             setLogs(prev => [...prev, "[ERROR] WebSocket connection failed. Is the backend running?"]);
+            setIsRunning(false);
+            setTestResult({
+                status: 'error',
+                message: 'WebSocket connection failed. Is the backend running?'
+            });
         };
     };
 
@@ -359,7 +356,7 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
                         <div className="flex items-center justify-between p-4 border-b border-slate-700">
                             <div className="flex items-center gap-3">
                                 <Code className="w-5 h-5 text-primary-400" />
-                                <span className="text-white font-bold">Test Code (Python)</span>
+                                <span className="text-white font-bold">Test Code</span>
                             </div>
                             <button onClick={() => setCodeModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
                                 <X className="w-5 h-5" />
@@ -374,8 +371,14 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
                 </div>
             )}
 
-            {/* Remote Execution Terminal Modal */}
-            <TestRunnerTerminal logs={logs} isOpen={terminalOpen} onClose={() => setTerminalOpen(false)} />
+            {/* Test Results Modal */}
+            <TestResultsModal
+                isOpen={resultsModalOpen}
+                onClose={() => setResultsModalOpen(false)}
+                result={testResult}
+                logs={logs}
+                isRunning={isRunning}
+            />
 
             <div className="flex justify-between items-end">
                 <div className="flex flex-col gap-1">
@@ -417,19 +420,17 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
                             </div>
 
                             <div className="space-y-4">
-                                <div>
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-tighter mb-2">Test Steps</p>
-                                    <div className="space-y-1.5">
-                                        {tc.steps?.map((step: string, sIdx: number) => (
-                                            <div key={sIdx} className="flex gap-2 text-sm text-slate-600">
-                                                <span className="text-primary-500 font-bold">{sIdx + 1}.</span>
-                                                {step}
-                                            </div>
-                                        ))}
-                                        {(!tc.steps || tc.steps.length === 0) && (
-                                            <p className="text-sm text-slate-400 italic">No steps defined</p>
-                                        )}
-                                    </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {tc.language && (
+                                        <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg">
+                                            {tc.language}
+                                        </span>
+                                    )}
+                                    {tc.target_files?.map((file: string, fIdx: number) => (
+                                        <span key={fIdx} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-mono rounded-lg">
+                                            {file}
+                                        </span>
+                                    ))}
                                 </div>
 
                                 <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
@@ -473,44 +474,6 @@ def test_${tc.description.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 
                         <p className="text-slate-500 mt-2">Generate requirements first to create prioritized, risk-based test cases.</p>
                     </div>
                 )}
-            </div>
-        </div>
-    );
-};
-
-// Sub-component for terminal output
-const TestRunnerTerminal = ({ logs, isOpen, onClose }: { logs: string[], isOpen: boolean, onClose: () => void }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-slate-950 w-full max-w-4xl h-[80vh] rounded-2xl border border-slate-800 flex flex-col shadow-2xl overflow-hidden">
-                <div className="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                    <span className="font-mono text-emerald-400 font-bold flex items-center gap-2">
-                        <TerminalSquare className="w-4 h-4" />
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Remote Test Execution
-                    </span>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="flex-1 p-6 overflow-auto font-mono text-xs space-y-1.5">
-                    {logs.map((log, i) => (
-                        <div key={i} className="break-words">
-                            <span className="text-slate-600 select-none mr-2">[{new Date().toLocaleTimeString()}]</span>
-                            <span className={
-                                log.startsWith('> ') ? 'text-yellow-400 font-bold' :
-                                    log.startsWith('[ERROR]') ? 'text-rose-500 font-bold' :
-                                        log.startsWith('[STATUS]') ? 'text-blue-400 font-bold' :
-                                            log.startsWith('[DONE]') ? 'text-emerald-400 font-bold' :
-                                                'text-slate-300'
-                            }>
-                                {log}
-                            </span>
-                        </div>
-                    ))}
-                    <div id="terminal-end" />
-                </div>
             </div>
         </div>
     );

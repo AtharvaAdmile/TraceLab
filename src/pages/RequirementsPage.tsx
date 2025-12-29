@@ -36,17 +36,18 @@ const RequirementsPage = () => {
             const newTestCases = await generateTestCasesForRequirement(req, `Source: ${req.source}`);
 
             if (newTestCases.length > 0) {
-                // Insert matching actual Supabase schema: description, steps, expected_result, compliance_tag
+                // Insert with executable test fields
                 const { error } = await supabase.from('test_cases').insert(
                     newTestCases.map(tc => ({
                         description: tc.title || 'Generated Test Case',
-                        steps: tc.steps || [],
                         expected_result: tc.expected_result || '',
-                        compliance_tag: (tc as any).compliance_tag || req.compliance_tags?.[0] || 'General',
+                        compliance_tag: tc.compliance_tag || req.compliance_tags?.[0] || 'General',
                         requirement_id: (req as any).id,
-                        // Save executable fields
+                        // Executable test fields
                         test_script: tc.test_script || '',
-                        dependencies: tc.dependencies || ['pytest'],
+                        test_filename: tc.test_filename || '',
+                        language: tc.language || 'python',
+                        dependencies: tc.dependencies || [],
                         target_files: tc.target_files || []
                     }))
                 );

@@ -1,42 +1,128 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
-  --color-primary-950: #082f49;
+    /* Primary Blue (SpineEdge inspired) */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-200: #bfdbfe;
+    --color-primary-300: #93c5fd;
+    --color-primary-400: #60a5fa;
+    --color-primary-500: #3b82f6;
+    --color-primary-600: #2563eb;
+    --color-primary-700: #1d4ed8;
+    --color-primary-800: #1e40af;
+    --color-primary-900: #1e3a8a;
+    --color-primary-950: #172554;
 
-  --color-healthcare-teal: #0d9488;
-  --color-healthcare-blue: #2563eb;
-  --color-healthcare-slate: #475569;
+    /* Slate for text/backgrounds */
+    --color-slate-50: #f8fafc;
+    --color-slate-100: #f1f5f9;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-400: #94a3b8;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-800: #1e293b;
+    --color-slate-900: #0f172a;
 
-  --blur-xs: 2px;
+    /* Status colors */
+    --color-success-500: #10b981;
+    --color-success-600: #059669;
+    --color-warning-500: #f59e0b;
+    --color-danger-500: #ef4444;
+
+    --blur-xs: 2px;
+
+    /* Shadows */
+    --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-elevated: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+
+    /* Animations */
+    --animate-marquee: marquee 30s linear infinite;
+    --animate-fade-in: fadeIn 0.5s ease-out;
+    --animate-slide-up: slideUp 0.5s ease-out;
 }
 
 @layer base {
-  body {
-    @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
+    body {
+        @apply bg-slate-50 text-slate-900 antialiased;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
 }
 
 @layer components {
-  .glass-card {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
-  }
+    .glass-card {
+        @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+    }
 
-  .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg active:scale-95;
-  }
+    .btn-primary {
+        @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98];
+    }
 
-  .btn-secondary {
-    @apply bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md active:scale-95;
-  }
+    .btn-secondary {
+        @apply bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium py-2.5 px-5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98];
+    }
+
+    .btn-outline {
+        @apply bg-transparent hover:bg-primary-50 text-primary-600 border border-primary-600 font-medium py-2.5 px-5 rounded-xl transition-all duration-200;
+    }
+
+    .card {
+        @apply bg-white rounded-2xl border border-slate-100 p-6;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .card-hover {
+        @apply bg-white rounded-2xl border border-slate-100 p-6 transition-shadow duration-300;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .card-hover:hover {
+        box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+    }
+
+    .section-heading {
+        @apply text-3xl md:text-4xl font-bold text-slate-900;
+    }
+
+    .section-subheading {
+        @apply text-lg text-slate-600 max-w-2xl;
+    }
+}
+
+@layer utilities {
+    .animate-marquee {
+        animation: marquee 30s linear infinite;
+    }
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

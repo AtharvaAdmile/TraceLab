@@ -24,18 +24,13 @@ export interface TestCase {
     test_case_id: string;
     title: string;
     type: 'Positive' | 'Negative' | 'Boundary' | 'Security' | 'Compliance';
-    priority: 'Critical' | 'High' | 'Medium' | 'Low';
-    preconditions: string[];
-    steps: string[];
-    test_data: any;
     expected_result: string;
-    compliance_verification: string;
-    risk_mitigation: string;
-    code: string;
-    // New fields for executable test cases
-    test_script: string;           // Executable Python test code
-    dependencies: string[];         // Required pip packages (e.g., ["pytest", "requests"])
-    target_files: string[];         // Repo files the test applies to (e.g., ["src/auth/login.py"])
+    compliance_tag: string;
+    test_script: string;            // Executable test code in target language
+    test_filename: string;          // Test file name (e.g., "test_text_processor.js")
+    language: string;               // Programming language (e.g., "python", "javascript")
+    dependencies: string[];         // Required packages from target file imports
+    target_files: string[];         // Repo files the test applies to
 }
 
 let activeProvider: AIProvider = 'Ollama';
@@ -91,7 +86,21 @@ const callGemini = async (prompt: string): Promise<string> => {
 };
 
 
-export const analyzeCodebase = async (digest: string): Promise<ExtractedRequirement[]> => {
+export const analyzeCodebase = async (digest: string, requirementsDoc?: string): Promise<ExtractedRequirement[]> => {
+    const requirementsSection = requirementsDoc ? `
+
+ADDITIONAL REQUIREMENTS DOCUMENT:
+The following requirements document has been provided by the user. Use this information to:
+1. Cross-reference with code requirements
+2. Identify any additional requirements not found in code
+3. Validate that code implementation matches documented requirements
+4. Extract any compliance-specific requirements mentioned
+
+Requirements Document Content:
+${requirementsDoc}
+
+` : '';
+    
     const prompt = `
 You are analyzing a healthcare software repository.
 
@@ -100,8 +109,7 @@ Extract ALL requirements from this code, including:
 2. Implicit requirements (business logic that implies a requirement)
 3. Compliance hints (mentions of FDA, IEC, HIPAA, ISO)
 4. Security patterns (encryption, authentication, validation)
-
-For each requirement found, output JSON:
+${requirementsSection}For each requirement found, output JSON:
 {
   "req_id": "REQ-FN-001" or "IMPLICIT-001" (if not explicitly marked),
   "content": "Clear requirement statement",
@@ -143,7 +151,7 @@ Output only valid JSON array. No preamble.
 
 export const generateTestCasesForRequirement = async (requirement: ExtractedRequirement, relatedCode: string, repoUrl?: string): Promise<TestCase[]> => {
     const prompt = `
-You are a healthcare QA automation expert creating EXECUTABLE test cases for medical device software.
+You are a healthcare QA automation expert creating EXECUTABLE, TARGETED test cases for medical device software.
 
 Requirement:
 ${requirement.content}
@@ -154,41 +162,61 @@ Source Code Context:
 ${relatedCode}
 ${repoUrl ? `Repository URL: ${repoUrl}` : ''}
 
-Generate exactly 3 EXECUTABLE test cases (with real Python pytest code):
+Generate exactly 3 EXECUTABLE test cases:
 1. Positive scenario (happy path)
 2. Negative scenario (invalid input)
 3. Boundary/Compliance scenario
+
+CRITICAL RULES:
+1. **Language Matching**: The test MUST be written in the SAME language as the target file.
+   - If target is "text_processor.js" → write JavaScript/Jest tests
+   - If target is "main.py" → write Python/pytest tests
+   - If target is "validator.ts" → write TypeScript/Jest tests
+
+2. **Targeted Imports**: The test MUST import from the target file directly.
+   - JavaScript: \`const { processText } = require('../src/text_processor');\`
+   - Python: \`from src.text_processor import process_text\`
+   - TypeScript: \`import { processText } from '../src/text_processor';\`
+
+3. **Test Filename Convention**: Name the test file to match the target.
+   - Target: "text_processor.js" → test_filename: "test_text_processor.js" or "text_processor.test.js"
+   - Target: "main.py" → test_filename: "test_main.py"
+   - Target: "validator.ts" → test_filename: "validator.test.ts"
+
+4. **Dependencies**: Extract dependencies from the target file's imports.
+   - If target imports "lodash", include "lodash" in dependencies
+   - Always include the test framework (pytest, jest, mocha, etc.)
 
 For EACH test case, output JSON with these EXACT fields:
 {
   "test_case_id": "TC-001",
   "title": "Short descriptive title",
   "type": "Positive",
-  "steps": ["Step 1", "Step 2", "Step 3"],
   "expected_result": "What should happen",
   "compliance_tag": "IEC_62304",
-  "test_script": "import pytest\\n\\ndef test_example():\\n    # Test implementation\\n    assert True",
-  "dependencies": ["pytest", "requests"],
-  "target_files": ["src/auth/login.py", "src/utils/validator.py"]
+  "test_script": "// Full executable test code that imports from target file",
+  "test_filename": "test_text_processor.js",
+  "language": "javascript",
+  "dependencies": ["jest", "lodash"],
+  "target_files": ["src/text_processor.js"]
 }
+
 IMPORTANT RULES for test_script:
-- Write complete, FULLY IMPLEMENTED Python pytest code.
-- DO NOT use "assert True" or "# TODO". All logic must be concrete.
-- Include necessary imports at the top.
-- Use descriptive function names starting with test_.
-- Implement actual mock logic or logic that tests the specific code context provided.
-- Reference the target_files if testing specific functionality.
-- If dependencies are needed (like mock or requests), include them in the 'dependencies' array.
+- Write complete, FULLY IMPLEMENTED test code in the target file's language.
+- MUST import/require the actual functions/classes from the target file.
+- DO NOT use placeholder assertions like "assert True" or "expect(true).toBe(true)".
+- Implement actual test logic that validates the requirement.
+- Use proper mocking for external dependencies if needed.
 
 IMPORTANT RULES for dependencies:
-- List ONLY the pip packages needed to run this specific test
-- Always include "pytest" as the test runner
-- Include any libraries used in the test (requests, numpy, etc.)
+- Include the test framework (pytest, jest, mocha, vitest, etc.)
+- Include libraries imported by the target file that the test needs
+- Include any mocking libraries used (unittest.mock, jest-mock, etc.)
 
 IMPORTANT RULES for target_files:
-- List the specific source files from the repository that this test validates
-- Use relative paths from repo root (e.g., "src/auth/login.py")
-- If testing general functionality, use empty array []
+- List the specific source files this test imports from and validates
+- Use relative paths from repo root (e.g., "src/text_processor.js")
+- This determines the language and import structure of the test
 
 Output ONLY a valid JSON array with 3 objects. No markdown, no explanation.
 `;
