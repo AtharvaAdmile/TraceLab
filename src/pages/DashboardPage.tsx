@@ -95,28 +95,44 @@ const DashboardPage = () => {
       const { data: projectsData, error } = await supabase
         .from('projects')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .eq('user_id', user?.uid)
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
 
       const projectsWithCounts = await Promise.all(
         (projectsData || []).map(async (project) => {
-          const [reqResult, testResult, issuesResult] = await Promise.all([
-            supabase.from('requirements').select('id', { count: 'exact' }).eq('project_id', project.id),
-            supabase.from('test_cases').select('id', { count: 'exact' }).eq('project_id', project.id),
-            supabase.from('compliance_issues').select('id', { count: 'exact' }).eq('project_id', project.id),
-          ]);
+          // Get requirements for this project
+          const { data: reqs } = await supabase
+            .from('requirements')
+            .select('id')
+            .eq('project_id', project.id);
 
-          const issuesCount = issuesResult.count || 0;
+          const reqIds = reqs?.map(r => r.id) || [];
+
+          // Count test cases linked to these requirements
+          const { count: testCount } = reqIds.length > 0
+            ? await supabase
+                .from('test_cases')
+                .select('id', { count: 'exact' })
+                .in('requirement_id', reqIds)
+            : { count: 0 };
+
+          // Count compliance issues for this project
+          const { count: issuesCount } = await supabase
+            .from('compliance_issues')
+            .select('id', { count: 'exact' })
+            .eq('project_id', project.id);
+
           let complianceStatus: 'compliant' | 'issues' | 'pending' = 'pending';
-          if (reqResult.count && reqResult.count > 0) {
-            complianceStatus = issuesCount === 0 ? 'compliant' : 'issues';
+          if (reqIds.length > 0) {
+            complianceStatus = (issuesCount || 0) === 0 ? 'compliant' : 'issues';
           }
 
           return {
             ...project,
-            requirements_count: reqResult.count || 0,
-            test_cases_count: testResult.count || 0,
+            requirements_count: reqIds.length,
+            test_cases_count: testCount || 0,
             compliance_status: complianceStatus,
           };
         })
@@ -133,10 +149,10 @@ const DashboardPage = () => {
   const fetchStats = async () => {
     try {
       const [projectsResult, testCasesResult, issuesResult, reqResult] = await Promise.all([
-        supabase.from('projects').select('id', { count: 'exact' }),
-        supabase.from('test_cases').select('id', { count: 'exact' }),
-        supabase.from('compliance_issues').select('id', { count: 'exact' }),
-        supabase.from('requirements').select('id', { count: 'exact' }),
+        supabase.from('projects').select('id', { count: 'exact' }).eq('user_id', user?.uid),
+        supabase.from('test_cases').select('id', { count: 'exact' }).eq('user_id', user?.uid),
+        supabase.from('compliance_issues').select('id', { count: 'exact' }).eq('user_id', user?.uid),
+        supabase.from('requirements').select('id', { count: 'exact' }).eq('user_id', user?.uid),
       ]);
 
       const totalReqs = reqResult.count || 0;
@@ -225,6 +241,7 @@ const DashboardPage = () => {
           repo_name: repoInfo.repo,
           owner: repoInfo.owner,
           digest_text: digest,
+          user_id: user?.uid,
         })
         .select()
         .single();
@@ -236,7 +253,7 @@ const DashboardPage = () => {
 
       if (requirements.length > 0) {
         const { error: reqError } = await supabase.from('requirements').insert(
-          requirements.map(r => ({ ...r, project_id: project.id }))
+          requirements.map(r => ({ ...r, project_id: project.id, user_id: user?.uid }))
         );
         if (reqError) console.error('Error storing requirements:', reqError);
       }
@@ -255,7 +272,7 @@ const DashboardPage = () => {
 
       if (complianceIssues.length > 0) {
         const { error: compError } = await supabase.from('compliance_issues').insert(
-          complianceIssues.map(pi => ({ ...pi, project_id: project.id }))
+          complianceIssues.map(pi => ({ ...pi, project_id: project.id, user_id: user?.uid }))
         );
         if (compError) console.error('Error storing compliance issues:', compError);
       }
@@ -280,15 +297,25 @@ const DashboardPage = () => {
 
     setLoading(true);
     try {
-      const tables = ['compliance_issues', 'test_cases', 'requirements', 'projects'];
-      for (const table of tables) {
-        const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        if (error) throw error;
-      }
+      // Delete in order to handle foreign key constraints
+      // compliance_issues -> test_cases -> requirements -> projects
+      const { error: compError } = await supabase.from('compliance_issues').delete().eq('user_id', user?.uid);
+      if (compError) throw compError;
+
+      const { error: testError } = await supabase.from('test_cases').delete().eq('user_id', user?.uid);
+      if (testError) throw testError;
+
+      const { error: reqError } = await supabase.from('requirements').delete().eq('user_id', user?.uid);
+      if (reqError) throw reqError;
+
+      const { error: projError } = await supabase.from('projects').delete().eq('user_id', user?.uid);
+      if (projError) throw projError;
+
       fetchProjects();
       fetchStats();
     } catch (error: any) {
       console.error('Cleanup failed:', error.message);
+      alert(`Failed to clear data: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -302,7 +329,8 @@ const DashboardPage = () => {
     });
   };
 
-  const truncateUrl = (url: string, maxLength = 40) => {
+  const truncateUrl = (url: string | null, maxLength = 40) => {
+    if (!url) return 'No URL';
     if (url.length <= maxLength) return url;
     return url.slice(0, maxLength) + '...';
   };

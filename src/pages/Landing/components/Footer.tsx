@@ -1,4 +1,4 @@
-import { FlaskConical, Twitter, Linkedin, Github, Youtube, Instagram } from 'lucide-react';
+import { FlaskConical, Twitter, Linkedin, Github, Instagram } from 'lucide-react';
 
 const Footer = () => {
   const footerLinks = {

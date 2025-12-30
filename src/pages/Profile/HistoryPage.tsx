@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Calendar,
   FileText,
@@ -26,6 +27,7 @@ interface AnalysisRecord {
 }
 
 const HistoryPage = () => {
+  const { user } = useAuth();
   const [records, setRecords] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<'all' | '7days' | '30days' | '90days'>('all');
@@ -41,6 +43,7 @@ const HistoryPage = () => {
       let query = supabase
         .from('projects')
         .select('*')
+        .eq('user_id', user?.uid)
         .order('created_at', { ascending: false });
 
       if (dateFilter !== 'all') {
