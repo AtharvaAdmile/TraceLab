@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Link2, Github, CheckCircle2, AlertCircle, ChevronRight, Search, TrendingUp, Target, Activity, Filter } from 'lucide-react';
+import { Link2, Github, CheckCircle2, AlertCircle, ChevronRight, Search, TrendingUp, Target, Activity } from 'lucide-react';
 
 const TraceabilityPage = () => {
       const { user } = useAuth();

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { ExtractedRequirement } from '../services/aiService';
 import { generateTestCasesForRequirement, setAIProvider } from '../services/aiService';
-import { ClipboardList, ExternalLink, Filter, AlertTriangle, FileText, Zap, X, Code, Loader2, Search, Target, TrendingUp, Eye, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, ExternalLink, AlertTriangle, FileText, Zap, X, Code, Loader2, Search, Target, TrendingUp, Eye, Sparkles, CheckCircle2 } from 'lucide-react';
 
 const RequirementsPage = () => {
       const { user } = useAuth();
@@ -95,7 +95,7 @@ const RequirementsPage = () => {
          total: requirements.length,
          critical: requirements.filter(r => r.priority === 'Critical').length,
          high: requirements.filter(r => r.priority === 'High').length,
-         covered: requirements.filter(r => Math.random() > 0.3).length // Simulate coverage
+         covered: requirements.filter(() => Math.random() > 0.3).length // Simulate coverage
      };
 
      if (loading) {

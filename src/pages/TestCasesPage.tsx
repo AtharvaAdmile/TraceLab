@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardList, Play, Code, Trash2, Zap, Loader2, X, Search, Filter, Activity, CheckCircle2, AlertCircle, Clock, Target, TrendingUp, Eye, Settings } from 'lucide-react';
+import { Play, Code, Trash2, Zap, Loader2, X, Search, Activity, CheckCircle2, AlertCircle, Clock, Target, TrendingUp, Eye } from 'lucide-react';
 import { generateTestCasesForRequirement, setAIProvider } from '../services/aiService';
 import TestResultsModal, { type TestResult } from '../components/TestResultsModal';
 

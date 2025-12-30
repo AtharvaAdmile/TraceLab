@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ShieldAlert, CheckCircle2, Info, Download, FileJson, ArrowRight, TrendingUp, AlertTriangle, FileCheck, Zap, Filter, RefreshCw } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ShieldAlert, CheckCircle2, Info, Download, FileJson, ArrowRight, AlertTriangle, FileCheck, RefreshCw } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 
 const CompliancePage = () => {
       const { user } = useAuth();
@@ -42,11 +42,6 @@ const CompliancePage = () => {
          ? issues
          : issues.filter(issue => issue.standard === selectedStandard);
 
-     const complianceData = standards.map(standard => ({
-         name: standard.split(' ')[0],
-         issues: issues.filter(i => i.standard === standard).length,
-         compliant: issues.filter(i => i.standard === standard).length === 0
-     }));
 
      if (loading) {
          return (
