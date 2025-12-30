@@ -1,4 +1,4 @@
-import { FlaskConical, Twitter, Linkedin, Github, Youtube } from 'lucide-react';
+import { FlaskConical, Twitter, Linkedin, Github, Youtube, Instagram } from 'lucide-react';
 
 const Footer = () => {
   const footerLinks = {
@@ -33,10 +33,10 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { icon: Twitter, href: '#twitter', label: 'Twitter' },
-    { icon: Linkedin, href: '#linkedin', label: 'LinkedIn' },
-    { icon: Github, href: '#github', label: 'GitHub' },
-    { icon: Youtube, href: '#youtube', label: 'YouTube' },
+    { icon: Twitter, href: 'https://x.com/atharva_admile', label: 'Twitter' },
+    { icon: Instagram, href: 'https://www.instagram.com/zenith_atharva/', label: 'Instagram' },
+    { icon: Linkedin, href: 'https://www.linkedin.com/in/atharvaadmile261/', label: 'LinkedIn' },
+    { icon: Github, href: 'https://github.com/AtharvaAdmile', label: 'GitHub' },
   ];
 
   return (

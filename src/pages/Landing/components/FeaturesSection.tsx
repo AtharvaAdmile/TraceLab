@@ -103,8 +103,65 @@ const FeaturesSection = () => {
                     ))}
                   </ul>
                 </div>
-                <div className={`${colors.bg} h-32 mx-6 mb-6 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-200`}>
-                  <span className="text-gray-400 text-sm">Feature Illustration</span>
+                <div className={`${colors.bg} h-32 mx-6 mb-6 rounded-lg flex items-center justify-center overflow-hidden relative`}>
+                  {index === 0 ? (
+                    // QA Engineers - Test automation illustration
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
+                          <TestTube2 className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="w-16 h-2 bg-white/40 rounded"></div>
+                        <div className="w-12 h-2 bg-white/30 rounded"></div>
+                        <div className="w-14 h-2 bg-white/20 rounded"></div>
+                      </div>
+                    </div>
+                  ) : index === 1 ? (
+                    // Regulatory Affairs - Compliance illustration
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
+                          <Shield className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full"></div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex gap-1">
+                          <div className="w-3 h-3 bg-white/50 rounded-full"></div>
+                          <div className="w-3 h-3 bg-white/50 rounded-full"></div>
+                          <div className="w-3 h-3 bg-white/50 rounded-full"></div>
+                        </div>
+                        <div className="w-20 h-1 bg-white/30 rounded"></div>
+                        <div className="w-16 h-1 bg-white/20 rounded"></div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Development Teams - CI/CD illustration
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center transform rotate-45">
+                          <GitBranch className="h-6 w-6 text-white transform -rotate-45" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-300 rounded-full"></div>
+                          <div className="w-8 h-1 bg-white/40 rounded"></div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                          <div className="w-6 h-1 bg-white/30 rounded"></div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <div className="w-10 h-1 bg-white/20 rounded"></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

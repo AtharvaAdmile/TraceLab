@@ -1,24 +1,37 @@
 const MarqueeStrip = () => {
-  const text = 'Our Technology +';
-  const items = Array(12).fill(text);
+  const techStack = [
+    'React 19',
+    'TypeScript',
+    'Vite',
+    'Tailwind CSS',
+    'Google Gemini AI',
+    'Supabase',
+    'MedGemma (Ollama)',
+    'Document & PDF AI',
+    'Recharts',
+    'Lucide Icons',
+    'Firebase'
+  ];
 
   return (
-    <div className="bg-[#2563eb] py-4 overflow-hidden">
+    <div className="bg-[#2563eb] py-4 overflow-hidden border-y border-white/10">
       <div className="flex animate-marquee whitespace-nowrap">
-        {items.map((item, index) => (
+        {/* First set of items */}
+        {techStack.map((tech, index) => (
           <span
             key={index}
-            className="text-white font-semibold text-lg mx-8 flex items-center gap-2"
+            className="text-white font-semibold text-lg mx-8 flex items-center gap-2 font-heading tracking-tight"
           >
-            {item}
+            {tech} <span className="text-white/40">•</span>
           </span>
         ))}
-        {items.map((item, index) => (
+        {/* Duplicate set for seamless looping */}
+        {techStack.map((tech, index) => (
           <span
             key={`duplicate-${index}`}
-            className="text-white font-semibold text-lg mx-8 flex items-center gap-2"
+            className="text-white font-semibold text-lg mx-8 flex items-center gap-2 font-heading tracking-tight"
           >
-            {item}
+            {tech} <span className="text-white/40">•</span>
           </span>
         ))}
       </div>
@@ -26,14 +39,16 @@ const MarqueeStrip = () => {
       <style>{`
         @keyframes marquee {
           0% {
-            transform: translateX(0%);
+            transform: translateX(0);
           }
           100% {
             transform: translateX(-50%);
           }
         }
         .animate-marquee {
-          animation: marquee 20s linear infinite;
+          display: flex;
+          width: fit-content;
+          animation: marquee 30s linear infinite;
         }
       `}</style>
     </div>
@@ -41,3 +56,4 @@ const MarqueeStrip = () => {
 };
 
 export default MarqueeStrip;
+

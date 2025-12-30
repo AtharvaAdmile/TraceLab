@@ -18,7 +18,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-8 w-8 text-[#2563eb]" />
-            <span className="text-xl font-bold text-gray-900">TraceLab</span>
+            <span className="text-xl font-bold text-gray-900 font-heading tracking-tight">TraceLab</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
@@ -34,14 +34,14 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <Link 
-              to="/auth/login" 
+            <Link
+              to="/auth/login"
               className="px-4 py-2 text-[#2563eb] border border-[#2563eb] rounded-lg font-medium hover:bg-blue-50 transition-colors"
             >
               Log In
             </Link>
-            <Link 
-              to="/auth/signup" 
+            <Link
+              to="/auth/signup"
               className="px-4 py-2 bg-[#2563eb] text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Get Started
@@ -69,14 +69,14 @@ const Navbar = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-gray-100">
-                <Link 
-                  to="/auth/login" 
+                <Link
+                  to="/auth/login"
                   className="px-4 py-2 text-[#2563eb] border border-[#2563eb] rounded-lg font-medium text-center"
                 >
                   Log In
                 </Link>
-                <Link 
-                  to="/auth/signup" 
+                <Link
+                  to="/auth/signup"
                   className="px-4 py-2 bg-[#2563eb] text-white rounded-lg font-medium text-center"
                 >
                   Get Started
