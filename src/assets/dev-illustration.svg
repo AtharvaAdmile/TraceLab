@@ -1,0 +1,52 @@
+<svg width="200" height="120" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Git branch structure -->
+  <circle cx="30" cy="40" r="8" fill="#8b5cf6"/>
+  <circle cx="70" cy="30" r="8" fill="#8b5cf6"/>
+  <circle cx="110" cy="40" r="8" fill="#8b5cf6"/>
+  <circle cx="150" cy="50" r="8" fill="#8b5cf6"/>
+  <circle cx="170" cy="70" r="8" fill="#10b981"/>
+
+  <!-- Branch lines -->
+  <path d="M38 40 L62 30" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
+  <path d="M78 30 L102 40" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
+  <path d="M118 40 L142 50" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
+  <path d="M158 50 L162 70" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- PR check marks -->
+  <circle cx="70" cy="30" r="12" fill="none" stroke="#10b981" stroke-width="2"/>
+  <path d="M65 30 L68 33 L77 24" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="110" cy="40" r="12" fill="none" stroke="#10b981" stroke-width="2"/>
+  <path d="M105 40 L108 43 L117 34" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="150" cy="50" r="12" fill="none" stroke="#10b981" stroke-width="2"/>
+  <path d="M145 50 L148 53 L157 44" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- CI/CD pipeline -->
+  <rect x="20" y="70" width="30" height="20" rx="3" fill="#3b82f6"/>
+  <text x="35" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="white" font-weight="bold">CI</text>
+
+  <rect x="60" y="70" width="30" height="20" rx="3" fill="#3b82f6"/>
+  <text x="75" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="white" font-weight="bold">CD</text>
+
+  <rect x="100" y="70" width="30" height="20" rx="3" fill="#3b82f6"/>
+  <text x="115" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="white" font-weight="bold">DEPLOY</text>
+
+  <!-- Pipeline arrows -->
+  <path d="M50 80 L60 80" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M90 80 L100 80" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M130 80 L140 80" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+    </marker>
+  </defs>
+
+  <!-- GitHub logo simplified -->
+  <circle cx="170" cy="25" r="8" fill="#24292e"/>
+  <path d="M166 25 C166 22.79 167.79 21 170 21 C172.21 21 174 22.79 174 25 C174 26.657 172.657 28 171 28 L169 28 C167.343 28 166 26.657 166 25 Z" fill="white"/>
+  <circle cx="168" cy="23" r="1" fill="#24292e"/>
+  <circle cx="172" cy="23" r="1" fill="#24292e"/>
+</svg>

@@ -1,0 +1,29 @@
+<svg width="200" height="120" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Test tube with liquid -->
+  <rect x="20" y="40" width="16" height="60" rx="8" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
+  <rect x="24" y="44" width="8" height="48" fill="#3b82f6" opacity="0.6"/>
+  <circle cx="28" cy="48" r="2" fill="#1d4ed8"/>
+
+  <!-- Progress bars representing automated tests -->
+  <rect x="50" y="30" width="80" height="8" rx="4" fill="#f1f5f9"/>
+  <rect x="50" y="30" width="60" height="8" rx="4" fill="#10b981"/>
+  <rect x="50" y="45" width="80" height="8" rx="4" fill="#f1f5f9"/>
+  <rect x="50" y="45" width="45" height="8" rx="4" fill="#10b981"/>
+  <rect x="50" y="60" width="80" height="8" rx="4" fill="#f1f5f9"/>
+  <rect x="50" y="60" width="70" height="8" rx="4" fill="#10b981"/>
+  <rect x="50" y="75" width="80" height="8" rx="4" fill="#f1f5f9"/>
+  <rect x="50" y="75" width="55" height="8" rx="4" fill="#10b981"/>
+
+  <!-- Checkmarks -->
+  <path d="M135 35 L140 40 L150 28" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M135 50 L140 55 L150 43" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M135 65 L140 70 L150 58" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M135 80 L140 85 L150 73" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- AI brain icon -->
+  <circle cx="170" cy="25" r="8" fill="#8b5cf6"/>
+  <path d="M165 25 Q170 20 175 25 Q170 30 165 25" fill="#8b5cf6"/>
+  <circle cx="168" cy="23" r="1" fill="white"/>
+  <circle cx="172" cy="23" r="1" fill="white"/>
+  <path d="M168 27 Q170 29 172 27" stroke="white" stroke-width="1" fill="none"/>
+</svg>

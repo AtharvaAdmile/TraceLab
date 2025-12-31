@@ -1,0 +1,29 @@
+<svg width="200" height="120" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield with compliance check -->
+  <path d="M100 15 L130 25 L130 55 L100 65 L70 55 L70 25 Z" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <path d="M85 35 L95 45 L115 30" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="100" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#16a34a" font-weight="bold">FDA 21 CFR</text>
+
+  <!-- Document stack -->
+  <rect x="140" y="20" width="40" height="50" rx="2" fill="#f8fafc" stroke="#64748b" stroke-width="1"/>
+  <rect x="145" y="25" width="30" height="4" fill="#e2e8f0"/>
+  <rect x="145" y="32" width="25" height="3" fill="#e2e8f0"/>
+  <rect x="145" y="38" width="20" height="3" fill="#e2e8f0"/>
+  <rect x="145" y="44" width="28" height="3" fill="#e2e8f0"/>
+  <rect x="145" y="50" width="22" height="3" fill="#e2e8f0"/>
+  <rect x="145" y="56" width="18" height="3" fill="#e2e8f0"/>
+
+  <!-- Audit trail arrows -->
+  <path d="M20 30 L35 30 L35 25 L50 35 L35 45 L35 40 L20 40" fill="#3b82f6" opacity="0.7"/>
+  <path d="M20 50 L35 50 L35 45 L50 55 L35 65 L35 60 L20 60" fill="#3b82f6" opacity="0.7"/>
+  <path d="M20 70 L35 70 L35 65 L50 75 L35 85 L35 80 L20 80" fill="#3b82f6" opacity="0.7"/>
+
+  <!-- Checkmarks on arrows -->
+  <path d="M25 35 L28 38 L33 33" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 55 L28 58 L33 53" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 75 L28 78 L33 73" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Compliance badge -->
+  <circle cx="165" cy="85" r="12" fill="#16a34a"/>
+  <path d="M158 85 L162 89 L172 79" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
