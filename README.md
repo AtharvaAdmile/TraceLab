@@ -2,7 +2,57 @@
 
 ![TraceLab Logo](src/assets/logo.png)
 
-TraceLab is a comprehensive medical device testing and compliance platform designed to help healthcare software developers ensure regulatory compliance, maintain traceability, and automate test generation for FDA, IEC, and HIPAA standards.
+## 📋 Project Description
+
+TraceLab is an AI-powered medical device software compliance platform that revolutionizes how healthcare organizations ensure regulatory adherence and maintain comprehensive traceability throughout their software development lifecycle. By leveraging advanced artificial intelligence and automated testing capabilities, TraceLab transforms complex regulatory compliance challenges into streamlined, efficient workflows.
+
+### What TraceLab Does
+
+**🔍 Intelligent Code Analysis**
+- Automatically fetches and analyzes GitHub repositories for medical device software
+- Extracts functional, security, and compliance requirements using AI (Google Gemini or local MedGemma)
+- Identifies security vulnerabilities and regulatory compliance gaps
+- Cross-references code with provided requirements documents for validation
+
+**🧪 Automated Test Generation & Execution**
+- Generates executable test cases in Python (pytest) and JavaScript (Node.js)
+- Creates targeted tests based on identified requirements and compliance standards
+- Executes tests in isolated, secure environments with automatic dependency management
+- Provides real-time feedback via WebSocket connections during test execution
+
+**⚖️ Regulatory Compliance Validation**
+- Validates compliance against major healthcare standards: FDA 21 CFR Part 11, IEC 62304, ISO 13485, HIPAA
+- Generates detailed compliance reports with severity classifications
+- Maintains audit trails for regulatory submissions and quality assurance
+- Provides compliance scoring and gap analysis for continuous improvement
+
+**🔗 Complete Traceability**
+- Links requirements to code implementations and corresponding test cases
+- Visualizes traceability matrices for regulatory review
+- Tracks all analysis activities and test executions
+- Enables comprehensive audit trails for medical device submissions
+
+### Why TraceLab Matters
+
+Medical device software development faces unique challenges:
+- **Complex Regulatory Requirements**: Multiple overlapping standards (FDA, IEC, ISO, HIPAA)
+- **Manual Compliance Processes**: Time-intensive requirement tracking and validation
+- **Test Coverage Gaps**: Difficulty ensuring comprehensive test coverage
+- **Traceability Complexity**: Challenging to maintain requirement-to-test-to-code mappings
+
+TraceLab addresses these challenges by automating the entire compliance workflow, from initial code analysis through regulatory submission preparation.
+
+### Key Benefits
+
+- **🚀 Accelerated Development**: Reduce compliance validation time by up to 80%
+- **🎯 Improved Accuracy**: AI-powered analysis reduces human error in requirement identification
+- **📊 Enhanced Traceability**: Complete audit trails for regulatory submissions
+- **🔒 Security First**: Isolated test environments and comprehensive security validation
+- **🤝 Team Collaboration**: Shared dashboards and standardized compliance processes
+
+---
+
+**TraceLab is designed specifically for medical device software teams who need to balance rapid development with strict regulatory requirements. It transforms the traditionally manual, time-intensive compliance process into an automated, AI-enhanced workflow that maintains the highest standards of safety and regulatory adherence.**
 
 ## 🏥 Overview
 

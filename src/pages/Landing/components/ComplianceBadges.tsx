@@ -51,12 +51,12 @@ const ComplianceBadges = () => {
           ))}
         </div>
 
-        <div className="mt-12 bg-gradient-to-r from-[#2563eb]/5 via-[#2563eb]/10 to-[#2563eb]/5 rounded-2xl p-8 text-center">
+        {/* <div className="mt-12 bg-gradient-to-r from-[#2563eb]/5 via-[#2563eb]/10 to-[#2563eb]/5 rounded-2xl p-8 text-center">
           <p className="text-gray-700 font-medium">
             <span className="text-[#2563eb] font-semibold">Trusted by 50+ healthcare software teams</span>{' '}
             building FDA-regulated medical devices, diagnostic software, and health IT systems.
           </p>
-        </div>
+        </div> */}
       </div>
     </section>
   );

@@ -86,12 +86,12 @@ const HowItWorks = () => {
           </div>
         </div>
 
-        <div className="mt-12 text-center">
+        {/* <div className="mt-12 text-center">
           <button className="px-8 py-4 bg-[#2563eb] text-white rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2">
             Try It Now — It's Free
             <ArrowRight className="h-5 w-5" />
           </button>
-        </div>
+        </div> */}
       </div>
     </section>
   );
